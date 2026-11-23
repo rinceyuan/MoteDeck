@@ -142,6 +142,9 @@ jobs:
         run: |
           python build/generate-app-icon.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # test branch only: keep the committed (released) icon binaries
+          git checkout -- .
+          git status --short
 
       # Fetch every ignored-but-required frozen input before taking the
       # fingerprint that the compile/test/build/package chain must preserve.
