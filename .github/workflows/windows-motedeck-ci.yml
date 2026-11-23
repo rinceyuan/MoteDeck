@@ -285,6 +285,12 @@ jobs:
             }
           }
 
+      - name: Restore committed icons after tests (test branch only)
+        shell: pwsh
+        run: |
+          git checkout -- .
+          git status --short
+
       - name: Test compiled HID helper
         shell: pwsh
         env:
