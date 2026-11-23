@@ -163,6 +163,34 @@ jobs:
           ./build/fetch-interception.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # LOCAL TEST BRANCH ONLY: WinUHid has no prebuilt release, so reuse the
+      # unmodified files shipped in the official 0.3.4 installer.
+      - name: Extract WinUHid from official 0.3.4 installer (test branch only)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $work = Join-Path $env:RUNNER_TEMP "md034"
+          New-Item -ItemType Directory -Force $work | Out-Null
+          gh release download v0.3.4 -R HZDavy/MoteDeck -p "MoteDeckSetup-0.3.4-unsigned.exe" -D $work
+          $setup = Join-Path $work "MoteDeckSetup-0.3.4-unsigned.exe"
+          $hash = (Get-FileHash -Algorithm SHA256 $setup).Hash
+          if ($hash -ne "5F19F25CF2D95563C448E80DFA244C38EB3A8D07B706881F461A5F297AB1C42C") { throw "unexpected installer hash $hash" }
+          $dir = Join-Path $work "app"
+          $p = Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/NOICONS","/DIR=`"$dir`"" -Wait -PassThru
+          Write-Host "installer exit code $($p.ExitCode)"
+          $root = @($dir, (Join-Path $env:LOCALAPPDATA "MoteDeck")) | Where-Object { Test-Path (Join-Path $_ "app\WinUHid.dll") } | Select-Object -First 1
+          if (-not $root) { throw "WinUHid.dll not found after installing 0.3.4" }
+          Get-Process | Where-Object { $_.Path -like "$root\*" } | ForEach-Object { Stop-Process -Id $_.Id -Force }
+          $dest = "build/third_party/winuhid"
+          New-Item -ItemType Directory -Force $dest | Out-Null
+          Copy-Item (Join-Path $root "app\WinUHid.dll") $dest
+          Copy-Item (Join-Path $root "app\winuhid\*") $dest
+          Get-ChildItem $dest | Format-Table Name, Length
+          ./build/fetch-winuhid.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Capture checked build inputs
         shell: pwsh
         run: |
